@@ -1,0 +1,245 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+--// ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "PrivateAimUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+
+--// Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 270, 0, 365)
+MainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+--// Title
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -45, 0, 40)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Private Aim Lock"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextSize = 16
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = MainFrame
+
+--// Minimize Button
+local Minimize = Instance.new("TextButton")
+Minimize.Size = UDim2.new(0, 32, 0, 28)
+Minimize.Position = UDim2.new(1, -40, 0, 6)
+Minimize.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Minimize.Text = "—"
+Minimize.TextColor3 = Color3.new(1, 1, 1)
+Minimize.TextSize = 20
+Minimize.Parent = MainFrame
+
+Instance.new("UICorner", Minimize).CornerRadius = UDim.new(0, 5)
+
+--// Content
+local Content = Instance.new("Frame")
+Content.Size = UDim2.new(1, 0, 1, -45)
+Content.Position = UDim2.new(0, 0, 0, 45)
+Content.BackgroundTransparency = 1
+Content.Parent = MainFrame
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0, 7)
+Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+Layout.Parent = Content
+
+--// Toggle creator
+local function createToggle(name, defaultState)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(0, 235, 0, 34)
+	button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.TextSize = 14
+	button.Font = Enum.Font.Gotham
+	button.Parent = Content
+
+	Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
+
+	local state = defaultState or false
+
+	local function update()
+		button.Text = name .. "  [ " .. (state and "ON" or "OFF") .. " ]"
+		button.BackgroundColor3 = state
+			and Color3.fromRGB(45, 120, 70)
+			or Color3.fromRGB(45, 45, 45)
+	end
+
+	button.MouseButton1Click:Connect(function()
+		state = not state
+		update()
+		print(name, state)
+	end)
+
+	update()
+
+	return button
+end
+
+--// Main buttons
+createToggle("Aim Lock", false)
+
+local Target = Instance.new("TextButton")
+Target.Size = UDim2.new(0, 235, 0, 34)
+Target.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Target.Text = "Target Lock: NONE"
+Target.TextColor3 = Color3.new(1, 1, 1)
+Target.TextSize = 14
+Target.Font = Enum.Font.Gotham
+Target.Parent = Content
+
+Instance.new("UICorner", Target).CornerRadius = UDim.new(0, 6)
+
+local Switch = Instance.new("TextButton")
+Switch.Size = UDim2.new(0, 235, 0, 34)
+Switch.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Switch.Text = "Switch Target"
+Switch.TextColor3 = Color3.new(1, 1, 1)
+Switch.TextSize = 14
+Switch.Font = Enum.Font.Gotham
+Switch.Parent = Content
+
+Instance.new("UICorner", Switch).CornerRadius = UDim.new(0, 6)
+
+createToggle("Wall Check", true)
+createToggle("Shoot Through Wall", false)
+createToggle("ESP", false)
+createToggle("Auto Shoot", false)
+
+--// FOV
+local FOV = 180
+
+local FOVButton = Instance.new("TextButton")
+FOVButton.Size = UDim2.new(0, 235, 0, 34)
+FOVButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+FOVButton.TextColor3 = Color3.new(1, 1, 1)
+FOVButton.TextSize = 14
+FOVButton.Font = Enum.Font.Gotham
+FOVButton.Text = "FOV: " .. FOV
+FOVButton.Parent = Content
+
+Instance.new("UICorner", FOVButton).CornerRadius = UDim.new(0, 6)
+
+FOVButton.MouseButton1Click:Connect(function()
+	if FOV == 100 then
+		FOV = 180
+	elseif FOV == 180 then
+		FOV = 250
+	elseif FOV == 250 then
+		FOV = 500
+	else
+		FOV = 100
+	end
+
+	FOVButton.Text = "FOV: " .. FOV
+end)
+
+--// Smoothness
+local Smoothness = 0.35
+
+local SmoothButton = Instance.new("TextButton")
+SmoothButton.Size = UDim2.new(0, 235, 0, 34)
+SmoothButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+SmoothButton.TextColor3 = Color3.new(1, 1, 1)
+SmoothButton.TextSize = 14
+SmoothButton.Font = Enum.Font.Gotham
+SmoothButton.Text = "Smoothness: " .. Smoothness
+SmoothButton.Parent = Content
+
+Instance.new("UICorner", SmoothButton).CornerRadius = UDim.new(0, 6)
+
+SmoothButton.MouseButton1Click:Connect(function()
+	if Smoothness == 0.35 then
+		Smoothness = 0.1
+	elseif Smoothness == 0.1 then
+		Smoothness = 0.7
+	else
+		Smoothness = 0.35
+	end
+
+	SmoothButton.Text = "Smoothness: " .. Smoothness
+end)
+
+--// Hitbox row
+local HitboxValue = 50
+
+local HitboxFrame = Instance.new("Frame")
+HitboxFrame.Size = UDim2.new(0, 235, 0, 40)
+HitboxFrame.BackgroundTransparency = 1
+HitboxFrame.Parent = Content
+
+local HitboxLabel = Instance.new("TextLabel")
+HitboxLabel.Size = UDim2.new(0, 105, 1, 0)
+HitboxLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+HitboxLabel.TextColor3 = Color3.new(1, 1, 1)
+HitboxLabel.TextSize = 13
+HitboxLabel.Font = Enum.Font.Gotham
+HitboxLabel.Text = "Hitbox: [ 50 ]"
+HitboxLabel.Parent = HitboxFrame
+
+Instance.new("UICorner", HitboxLabel).CornerRadius = UDim.new(0, 6)
+
+local Minus = Instance.new("TextButton")
+Minus.Size = UDim2.new(0, 55, 1, 0)
+Minus.Position = UDim2.new(0, 115, 0, 0)
+Minus.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Minus.Text = "−"
+Minus.TextColor3 = Color3.new(1, 1, 1)
+Minus.TextSize = 20
+Minus.Parent = HitboxFrame
+
+Instance.new("UICorner", Minus).CornerRadius = UDim.new(0, 6)
+
+local Plus = Instance.new("TextButton")
+Plus.Size = UDim2.new(0, 55, 1, 0)
+Plus.Position = UDim2.new(0, 180, 0, 0)
+Plus.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Plus.Text = "+"
+Plus.TextColor3 = Color3.new(1, 1, 1)
+Plus.TextSize = 20
+Plus.Parent = HitboxFrame
+
+Instance.new("UICorner", Plus).CornerRadius = UDim.new(0, 6)
+
+local function updateHitbox()
+	HitboxLabel.Text = "Hitbox: [ " .. HitboxValue .. " ]"
+end
+
+Minus.MouseButton1Click:Connect(function()
+	HitboxValue = math.max(0, HitboxValue - 10)
+	updateHitbox()
+end)
+
+Plus.MouseButton1Click:Connect(function()
+	HitboxValue = math.min(100, HitboxValue + 10)
+	updateHitbox()
+end)
+
+--// Minimize
+local minimized = false
+
+Minimize.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	Content.Visible = not minimized
+
+	if minimized then
+		MainFrame.Size = UDim2.new(0, 270, 0, 45)
+		Minimize.Text = "+"
+	else
+		MainFrame.Size = UDim2.new(0, 270, 0, 365)
+		Minimize.Text = "—"
+	end
+end)
