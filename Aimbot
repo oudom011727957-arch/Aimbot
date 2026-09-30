@@ -1,0 +1,428 @@
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Core Variables
+local AimbotEnabled = false
+local WallCheckEnabled = true
+local FOVRadius = 180
+local Smoothness = 0.35
+local LockTarget = nil
+
+-- UI Creation (Delta Mobile Optimized)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DeltaMobileAimUI"
+ScreenGui.ResetOnSpawn = false
+-- Protect GUI from detection if using advanced executors
+if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end 
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Main Menu Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 240, 0, 320)
+MainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true -- Essential for mobile dragging
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundTransparency = 1
+Title.Text = "Private Aim Lock"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = MainFrame
+
+-- Minimize Button (X)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Position = UDim2.new(1, -30, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+CloseBtn.Font = Enum.Font.SourceSansBold
+CloseBtn.TextSize = 14
+CloseBtn.Parent = MainFrame
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 5)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+-- Layout Configuration
+local Layout = Instance.new("UIListLayout")
+Layout.Parent = MainFrame
+Layout.SortOrder = Enum.SortOrder.LayoutOrder
+Layout.Padding = UDim.new(0, 8)
+Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local Padding = Instance.new("UIPadding")
+Padding.PaddingTop = UDim.new(0, 40)
+Padding.Parent = MainFrame
+
+-- Helper to Create Menu Elements
+local function createMenuButton(text, color, order)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 210, 0, 32)
+    btn.BackgroundColor3 = color
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 13
+    btn.Text = text
+    btn.LayoutOrder = order
+    btn.Parent = MainFrame
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    return btn
+end
+
+-- 1. Main Toggle Button
+local AimToggle = createMenuButton("Aim: OFF [Tap Screen Button]", Color3.fromRGB(150, 50, 50), 1)
+
+-- 2. Target Status Label
+local TargetLabel = createMenuButton("Target Lock: NONE", Color3.fromRGB(40, 40, 40), 2)
+TargetLabel.Active = false
+
+-- 3. Switch Target Button
+local SwitchBtn = createMenuButton("Switch Target", Color3.fromRGB(45, 45, 45), 3)
+
+-- 4. Wall Check Toggle Button
+local WallToggle = createMenuButton("WallCheck: ON", Color3.fromRGB(40, 80, 90), 4)
+
+-- 5. FOV Value Selector Button
+local FOVBtn = createMenuButton("FOV: " .. FOVRadius, Color3.fromRGB(45, 45, 45), 5)
+
+-- 6. Smoothness Value Selector Button
+local SmoothBtn = createMenuButton("Smoothness: " .. Smoothness, Color3.fromRGB(45, 45, 45), 6)
+
+-- Visual FOV Ring Layout (Draws the circle seen in your image)
+local FOVCircle = Instance.new("Frame")
+FOVCircle.Size = UDim2.new(0, FOVRadius * 2, 0, FOVRadius * 2)
+FOVCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+FOVCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+FOVCircle.BackgroundTransparency = 1
+FOVCircle.Parent = ScreenGui
+
+local FOVStroke = Instance.new("UIStroke")
+FOVStroke.Color = Color3.fromRGB(100, 150, 255)
+FOVStroke.Thickness = 1.5
+FOVStroke.Transparency = 0.4
+FOVStroke.Parent = FOVCircle
+
+local FOVCorner = Instance.new("UICorner")
+FOVCorner.CornerRadius = UDim.new(1, 0) -- Makes it a perfect circle
+FOVCorner.Parent = FOVCircle
+
+-- Update FOV Circle Position to center of screen
+RunService.RenderStepped:Connect(function()
+    local screenSize = Camera.ViewportSize
+    FOVCircle.Position = UDim2.new(0, screenSize.X / 2, 0, screenSize.Y / 2)
+    FOVCircle.Size = UDim2.new(0, FOVRadius * 2, 0, FOVRadius * 2)
+end)
+
+-- Button Functionalities
+local function updateAimState(state)
+    AimbotEnabled = state
+    if AimbotEnabled then
+        AimToggle.Text = "Aim: ON"
+        AimToggle.BackgroundColor3 = Color3.fromRGB(50, 130, 70)
+    else
+        AimToggle.Text = "Aim: OFF"
+        AimToggle.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
+        LockTarget = nil
+    end
+end
+
+AimToggle.MouseButton1Click:Connect(function()
+    updateAimState(not AimbotEnabled)
+end)
+
+WallToggle.MouseButton1Click:Connect(function()
+    WallCheckEnabled = not WallCheckEnabled
+    WallToggle.Text = WallCheckEnabled and "WallCheck: ON" or "WallCheck: OFF"
+    WallToggle.BackgroundColor3 = WallCheckEnabled and Color3.fromRGB(40, 80, 90) or Color3.fromRGB(100, 50, 50)
+end)
+
+FOVBtn.MouseButton1Click:Connect(function()
+    if FOVRadius == 100 then FOVRadius = 180
+    elseif FOVRadius == 180 then FOVRadius = 250
+    elseif FOVRadius == 250 then FOVRadius = 500
+    else FOVRadius = 100 end
+    FOVBtn.Text = "FOV: " .. FOVRadius
+end)
+
+SmoothBtn.MouseButton1Click:Connect(function()
+    if Smoothness == 0.35 then Smoothness = 0.1
+    elseif Smoothness == 0.1 then Smoothness = 0.7
+    else Smoothness = 0.35 end
+    SmoothBtn.Text = "Smoothness: " .. Smoothness
+end)
+
+-- Wall Check Validation Logic
+local function isVisible(targetPart)
+    if not WallCheckEnabled then return true end
+    local origin = Camera.CFrame.Position
+    local direction = targetPart.Position - origin
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetPart.Parent}
+    
+    local raycastResult = workspace:Raycast(origin, direction, raycastParams)
+    return raycastResult == nil -- True if path is completely clear
+end
+
+-- Core Logic: Find valid targets inside FOV Circle
+local function getClosestPlayer(ignoreCurrent)
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    local centerScreen = Camera.ViewportSize / 2
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if ignoreCurrent and player == LockTarget then continue end
+            local hrp = player.Character.HumanoidRootPart
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            
+            if humanoid and humanoid.Health > 0 then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - centerScreen).Magnitude
+                    if distance < shortestDistance and distance <= FOVRadius then
+                        if isVisible(hrp) then
+                            shortestDistance = distance
+                            closestPlayer = player
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+SwitchBtn.MouseButton1Click:Connect(function()
+    LockTarget = getClosestPlayer(true)
+end)
+
+-- Mobile On-Screen Action Button Integration
+local function handleMobileAction(actionName, inputState, inputObject)
+
+if inputState == Enum.UserInputState.Begin then
+        updateAimState(not AimbotEnabled)
+    end
+end
+-- Creates a dedicated touch button labeled "Aim Lock" on the mobile overlay
+ContextActionService:BindAction("MobileAimToggle", handleMobileAction, true, Enum.KeyCode.ButtonR2)
+ContextActionService:SetTitle("MobileAimToggle", "Aim Lock")
+ContextActionService:SetPosition("MobileAimToggle", UDim2.new(0.75, 0, 0.45, 0))
+
+-- Lock Tracking Loop
+RunService.RenderStepped:Connect(function()
+    if not AimbotEnabled then
+        TargetLabel.Text = "Target Lock: NONE"
+        return
+    end
+
+    if not LockTarget or not LockTarget.Character or not LockTarget.Character:FindFirstChild("HumanoidRootPart") or (LockTarget.Character:FindFirstChild("Humanoid") and LockTarget.Character.Humanoid.Health <= 0) or not isVisible(LockTarget.Character.HumanoidRootPart) then
+        LockTarget = getClosestPlayer(false)
+    end
+
+    if LockTarget and LockTarget.Character and LockTarget.Character:FindFirstChild("HumanoidRootPart") then
+        TargetLabel.Text = "Target Lock: " .. LockTarget.Name:sub(1, 12)
+        
+        -- Smooth Lock interpolation
+        local targetPosition = LockTarget.Character.HumanoidRootPart.Position
+        local currentCFrame = Camera.CFrame
+        local targetCFrame = CFrame.new(currentCFrame.Position, targetPosition)
+        
+        Camera.CFrame = currentCFrame:Lerp(targetCFrame, Smoothness)
+    else
+        TargetLabel.Text = "Target Lock: SEARCHING"
+    end
+end)local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+--// GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "DeltaMobileAimUI"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
+
+--// Main frame
+local main = Instance.new("Frame")
+main.Size = UDim2.new(0, 280, 0, 270)
+main.Position = UDim2.new(0.5, -140, 0.5, -135)
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+main.BorderSizePixel = 0
+main.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = main
+
+--// Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -45, 0, 40)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "DeltaMobileAimUI"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextSize = 18
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = main
+
+--// Minimize
+local minimize = Instance.new("TextButton")
+minimize.Size = UDim2.new(0, 40, 0, 40)
+minimize.Position = UDim2.new(1, -45, 0, 0)
+minimize.BackgroundTransparency = 1
+minimize.Text = "—"
+minimize.TextColor3 = Color3.new(1, 1, 1)
+minimize.TextSize = 24
+minimize.Parent = main
+
+local minimized = false
+
+--// Toggle function
+local function createToggle(name, y, callback)
+
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -20, 0, 42)
+	button.Position = UDim2.new(0, 10, 0, y)
+	button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.TextSize = 15
+	button.Font = Enum.Font.Gotham
+	button.Text = name .. "  [ OFF ]"
+	button.Parent = main
+
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 7)
+	c.Parent = button
+
+	local enabled = false
+
+	button.MouseButton1Click:Connect(function()
+
+		enabled = not enabled
+
+		if enabled then
+			button.Text = name .. "  [ ON ]"
+		else
+			button.Text = name .. "  [ OFF ]"
+		end
+
+		callback(enabled)
+	end)
+
+	return button
+end
+
+--// Toggles
+createToggle("Auto Shoot", 45, function(enabled)
+	print("Auto Shoot:", enabled)
+end)
+
+createToggle("ESP", 90, function(enabled)
+	print("ESP:", enabled)
+end)
+
+createToggle("Wall Shoot", 135, function(enabled)
+	print("Wall Shoot:", enabled)
+end)
+
+--// Hitbox
+local hitboxValue = 50
+
+local hitboxLabel = Instance.new("TextLabel")
+hitboxLabel.Size = UDim2.new(0, 120, 0, 42)
+hitboxLabel.Position = UDim2.new(0, 10, 0, 190)
+hitboxLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+hitboxLabel.TextColor3 = Color3.new(1, 1, 1)
+hitboxLabel.TextSize = 15
+hitboxLabel.Font = Enum.Font.Gotham
+hitboxLabel.Text = "Hitbox: [ 50 ]"
+hitboxLabel.Parent = main
+
+local c1 = Instance.new("UICorner")
+c1.CornerRadius = UDim.new(0, 7)
+c1.Parent = hitboxLabel
+
+--// Minus
+local minus = Instance.new("TextButton")
+minus.Size = UDim2.new(0, 55, 0, 42)
+minus.Position = UDim2.new(0, 140, 0, 190)
+minus.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+minus.TextColor3 = Color3.new(1, 1, 1)
+minus.Text = "−"
+minus.TextSize = 22
+minus.Parent = main
+
+local c2 = Instance.new("UICorner")
+c2.CornerRadius = UDim.new(0, 7)
+c2.Parent = minus
+
+--// Plus
+local plus = Instance.new("TextButton")
+plus.Size = UDim2.new(0, 55, 0, 42)
+plus.Position = UDim2.new(0, 205, 0, 190)
+plus.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+plus.TextColor3 = Color3.new(1, 1, 1)
+plus.Text = "+"
+plus.TextSize = 22
+plus.Parent = main
+
+local c3 = Instance.new("UICorner")
+c3.CornerRadius = UDim.new(0, 7)
+c3.Parent = plus
+
+--// Update hitbox display
+local function updateHitbox()
+	hitboxLabel.Text = "Hitbox: [ " .. hitboxValue .. " ]"
+	print("Hitbox:", hitboxValue)
+end
+
+minus.MouseButton1Click:Connect(function()
+	hitboxValue = math.max(0, hitboxValue - 10)
+	updateHitbox()
+end)
+
+plus.MouseButton1Click:Connect(function()
+	hitboxValue = math.min(100, hitboxValue + 10)
+	updateHitbox()
+end)
+
+--// Minimize
+minimize.MouseButton1Click:Connect(function()
+
+	minimized = not minimized
+
+	for _, object in ipairs(main:GetChildren()) do
+		if object ~= title
+			and object ~= minimize
+			and not object:IsA("UICorner") then
+
+			object.Visible = not minimized
+		end
+	end
+
+	if minimized then
+		main.Size = UDim2.new(0, 280, 0, 40)
+	else
+		main.Size = UDim2.new(0, 280, 0, 270)
+	end
+end)
